@@ -1,25 +1,28 @@
-# Transport Agent – Tholen + Moerdijk
+# Transport Agent v3 – z twardym fallbackiem env
 
-- Wczytuje arkusze **Tholen**, **Moerdijk** (także `Moerdijk `), scala je w jeden *Planing*.
-- Rozdziela kolumnę `Van - Tot` na `Van` i `Tot`.
-- Dla Tholen automatycznie dodaje adres: **Marconiweg 3, 4691 SV Tholen**.
-- Wczytuje arkusze **Pracownicy** (opcjonalny) i **Kierowcy** (wymagany).
-- Filtruje kontekst po godzinie i lokalizacji, minimalizując koszty API.
-- Responses API z **streamingiem** odpowiedzi.
+- Klucz pobierany z `st.secrets["OPENAI_API_KEY"]` **i** ustawiany w `os.environ["OPENAI_API_KEY"]`.
+- Jeśli w `st.secrets` brak, używany jest `os.getenv("OPENAI_API_KEY")`.
+- Parser łączy arkusze **Tholen** i **Moerdijk**, rozdziela `Van - Tot` na `Van`/`Tot`, dodaje adres dla Tholen.
 
-## Uruchom w Streamlit Cloud
-1. Prześlij pliki do repo na GitHub.
-2. Deploy: *Create app* → `app_streamlit_transport_v2.py`.
-3. W **Secrets** dodaj:
-   ```
-   OPENAI_API_KEY = "sk-..."
-   ```
+## Ustawienie klucza (Cloud)
+W panelu Streamlit → **Settings → Secrets** wklej:
+```
+OPENAI_API_KEY = "sk-..."
+```
 
 ## Lokalnie (opcjonalnie)
+`.streamlit/secrets.toml`:
 ```
-python -m venv .venv
-# Windows: .\.venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
+OPENAI_API_KEY = "sk-..."
+```
+
+Lub zmienna środowiskowa:
+```
+export OPENAI_API_KEY="sk-..."
+```
+
+## Start
+```
 pip install -r requirements.txt
 streamlit run app_streamlit_transport_v2.py
 ```

@@ -18,12 +18,26 @@ ADDRESS_BOOK: Dict[str, str] = {
 }
 
 def get_api_key() -> Optional[str]:
+    """Zwraca klucz API. Jeśli jest w st.secrets – ustawia też os.environ
+    tak, by klient OpenAI miał spójne źródło. Potem fallback do zmiennej środowiskowej.
+    """
+    key: Optional[str] = None
     try:
+        # Streamlit Secrets – preferowane w chmurze
         if "OPENAI_API_KEY" in st.secrets:
-            return st.secrets["OPENAI_API_KEY"]
+            key = st.secrets["OPENAI_API_KEY"]
     except Exception:
-        pass
-    return os.getenv("OPENAI_API_KEY")
+        key = None
+
+    # Fallback do zmiennej środowiskowej
+    if not key:
+        key = os.getenv("OPENAI_API_KEY")
+
+    # Ustaw spójnie w środowisku procesu (dla bibliotek odczytujących z env)
+    if key and os.environ.get("OPENAI_API_KEY") != key:
+        os.environ["OPENAI_API_KEY"] = key
+
+    return key
 
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -84,8 +98,6 @@ def enrich_addresses(df: pd.DataFrame) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def load_data(file) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     xls = pd.ExcelFile(file)
-
-    # Planingi z wielu arkuszy
     planning_sheets = []
     for cand in ["Planing", "Tholen", "Moerdijk", "Moerdijk "]:
         if cand in xls.sheet_names:
@@ -96,7 +108,6 @@ def load_data(file) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     plan_parts = []
     for sh in planning_sheets:
         raw = pd.read_excel(xls, sh)
-        # znajdź wiersz nagłówka (kol. 0 ma 'Dienst')
         hdr_idx = raw.index[raw.iloc[:, 0].astype(str).str.contains("Dienst", na=False)].tolist()
         start = (hdr_idx[0] + 1) if hdr_idx else 5
         data = raw.iloc[start:].copy()
@@ -113,7 +124,6 @@ def load_data(file) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         part = pd.DataFrame({k: data.get(v) for k, v in mapping.items()})
         part = part.dropna(how="all")
 
-        # split Van - Tot -> Van, Tot
         vt = part["VanTot"].fillna("").astype(str).str.split("-", n=1, expand=True)
         part["Van"] = vt[0].str.strip()
         part["Tot"] = vt[1].str.strip()
@@ -126,14 +136,12 @@ def load_data(file) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
     plan = pd.concat(plan_parts, ignore_index=True)
 
-    # Workers (opcjonalny)
     workers = pd.DataFrame()
     for nm in ["Pracownicy", "Pula", "Workers", "Employees", "Pula pracowników"]:
         if nm in xls.sheet_names:
             workers = pd.read_excel(xls, nm)
             break
 
-    # Kierowcy (wymagany)
     if "Kierowcy" not in xls.sheet_names:
         raise ValueError("Brak arkusza 'Kierowcy'.")
     drivers = pd.read_excel(xls, "Kierowcy")
@@ -253,9 +261,9 @@ st.title(APP_TITLE)
 
 api_key = get_api_key()
 if not api_key:
-    st.warning("Ustaw OPENAI_API_KEY w st.secrets lub w zmiennych środowiskowych.")
+    st.warning("Ustaw OPENAI_API_KEY w sekcjach Secrets albo w zmiennych środowiskowych.")
 
-client = OpenAI(api_key=api_key) if api_key else None
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY")) if api_key else None
 
 uploaded_file = st.file_uploader(
     "Wgraj plik Excel: Tholen + Moerdijk + Pracownicy + Kierowcy", type=[".xlsx", ".xlsm"]
