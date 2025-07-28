@@ -1,1 +1,1 @@
-Agent v5 with plan-act-observe and tools.
+v5.1: simplified messages, anyOf in schema, step preview in UI.
